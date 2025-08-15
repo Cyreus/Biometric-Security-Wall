@@ -97,28 +97,6 @@ def validation():
     else:
         return "Invalid email or password", 401
 
-
-# @app.route('/deneme', methods=['POST'])
-# def deneme():
-#     try:
-#         confidence_score = request.form.get('confidence')
-#         predicted_labelx = request.form.get('predictedLabel')
-#
-#         print(confidence_score, predicted_labelx)
-#
-#         if float(confidence_score) > 0.75 and predicted_labelx == 'ali':
-#             return render_template("login.html", message=f"{predicted_labelx}")
-#         elif predicted_labelx== "" or predicted_labelx == 'Background Noise':
-#             return "unknown"
-#         else:
-#             return "unknown"
-#
-#     except Exception as e:
-#         print(e)
-#         return jsonify(success=False, error=str(e))
-
-
-
 @app.route('/predict', methods=['POST'])
 def predict_audio():
     if 'audio' not in request.files:
