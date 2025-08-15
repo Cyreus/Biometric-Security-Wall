@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monolog Ses Tanıma</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+    <style>
+        body {
+            background-color: black;
+            color: #40E0D0; /* Turkuvaz */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            position: relative; /* İçindeki elementlerin konumlandırılabilmesi için gerekli */
+        }
+        .container {
+            text-align: center;
+            z-index: 2; /* Metin ve butonların logonun üstünde görünmesini sağlamak için */
+            position: relative;
+        }
+        img {
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.2; /* Logonun arka planda kalmasını sağlar */
+            z-index: 1; /* Logonun metinlerin altında olmasını sağlar */
+        }
+        button {
+            margin: 5px;
+        }
+        #audioPlayer {
+            margin-top: 15px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+    <img src="{{ url_for('static', filename='/images/logo.png') }}" alt="Cyreus Defence Services">
+    <div class="container">
+        <h1>Security Wall</h1>
+        <p>Please record your voice and submit! (max 5 sec).</p>
+        <button id="startRecord" class="btn btn-outline-info">Start Record</button>
+{#        <button type="button" class="btn btn-outline-warning" onclick="init()">Start Record</button>#}
+        <button id="stopRecord" class="btn btn-outline-danger" style="display:none;">Stop Record</button>
+        <p id="status">Condition : Ready</p>
+
+        <audio id="audioPlayer" controls style="display:none;"></audio>
+        <br>
+        <button id="uploadAudio" class="btn btn-outline-info" style="display:none;">Analyze</button>
+        <p id="result"></p>
+        <br>
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        const startRecordButton = document.getElementById('startRecord');
+        const stopRecordButton = document.getElementById('stopRecord');
+        const uploadAudioButton = document.getElementById('uploadAudio');
+        const statusText = document.getElementById('status');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const resultText = document.getElementById('result');
+
+        startRecordButton.onclick = () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.start();
+
+                    statusText.textContent = "Condition : Recording...";
+                    startRecordButton.style.display = "none"; // Kaydı Başlat butonunu gizle
+                    stopRecordButton.style.display = "inline-block"; // Durdur butonunu göster
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        const objectURL = (window.URL || window.webkitURL).createObjectURL(audioBlob); // Alternatif URL desteği
+                        audioPlayer.src = objectURL;
+                        audioPlayer.style.display = "block";
+                        uploadAudioButton.style.display = "inline";
+                        statusText.textContent = "Condition : Recorded Successfully.";
+                    };
+
+
+                    setTimeout(() => {
+                        if (mediaRecorder.state === "recording") {
+                            mediaRecorder.stop();
+                            statusText.textContent = "Condition : Record Stopped (Max duration reached).";
+                            stopRecordButton.style.display = "none"; // Durdur butonunu gizle
+                            startRecordButton.style.display = "inline-block"; // Kaydı Başlat butonunu göster
+                        }
+                    }, 5000); // 5000ms = 5sn
+                });
+        };
+
+        stopRecordButton.onclick = () => {
+            if (mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                statusText.textContent = "Condition : Record Stopped.";
+                stopRecordButton.style.display = "none"; // Durdur butonunu gizle
+                startRecordButton.style.display = "inline-block"; // Kaydı Başlat butonunu göster
+            }
+        };
+
+        uploadAudioButton.onclick = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "monolog.wav");
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultText.textContent = data.message
+
+                    setTimeout(() => {
+                        window.location.href = "/login";
+                    }, 1000);
+                    } else {
+                        resultText.textContent = "Error: " + data.message;
+                    }
+            })
+            .catch(error => {
+                resultText.textContent = "Server Error: " + error.message;
+            });
+        };
+
+
+    </script>
+    <script>
+        function formatDateForMSSQL(datetime) {
+            return datetime.getFullYear() + '-' +
+                   String(datetime.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(datetime.getDate()).padStart(2, '0') + ' ' +
+                   String(datetime.getHours()).padStart(2, '0') + ':' +
+                   String(datetime.getMinutes()).padStart(2, '0') + ':' +
+                   String(datetime.getSeconds()).padStart(2, '0');
+        }
+
+        const details = {{ details | tojson }};
+        const timestamp = formatDateForMSSQL(new Date());
+
+        fetch('/create-log', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ip: details.ip,
+                city: "Bursa",
+                region: "Bursa Province",
+                country: "TR",
+                loc:"40.1956,29.0601",
+                org:"AS16135 TURKCELL ILETISIM HIZMETLERI A.S.",
+                postal:"16250",
+                timezone:"Europe/Istanbul",
+                timestamp:timestamp
+
+            }),
+        })
+        .then(response => response.json())
+        .then(data => console.log(data))
+        .catch(error => console.error('Error:', error));
+    </script>
+
+{#     <script type="text/javascript">#}
+{#        const URL = "https://teachablemachine.withgoogle.com/models/cXUD3KF_9/";#}
+{##}
+{#        async function createModel() {#}
+{#            const checkpointURL = URL + "model.json"; // model topology#}
+{#            const metadataURL = URL + "metadata.json"; // model metadata#}
+{##}
+{#            const recognizer = speechCommands.create(#}
+{#                "BROWSER_FFT", // fourier transform type, not useful to change#}
+{#                undefined, // speech commands vocabulary feature, not useful for your models#}
+{#                checkpointURL,#}
+{#                metadataURL);#}
+{##}
+{#            await recognizer.ensureModelLoaded();#}
+{##}
+{#            return recognizer;#}
+{#        }#}
+{##}
+{#        async function init() {#}
+{#            const recognizer = await createModel();#}
+{#            const classLabels = recognizer.wordLabels();#}
+{##}
+{#            let bestScore = 0;#}
+{#            let bestLabel = "";#}
+{##}
+{#            recognizer.listen(result => {#}
+{#                const scores = result.scores;#}
+{#                for (let i = 0; i < classLabels.length; i++) {#}
+{#                    if (scores[i] > bestScore) {#}
+{#                        bestScore = scores[i];#}
+{#                        bestLabel = classLabels[i];#}
+{#                    }#}
+{#                }#}
+{#            }, {#}
+{#                includeSpectrogram: true,#}
+{#                probabilityThreshold: 0.90,#}
+{#                invokeCallbackOnNoiseAndUnknown: true,#}
+{#                overlapFactor: 0.50#}
+{#            });#}
+{##}
+{#                  setTimeout(() => {#}
+{#            recognizer.stopListening();#}
+{##}
+{#            let form = document.createElement("form");#}
+{#            form.style.display = "none";#}
+{#            form.method = "POST";#}
+{#            form.action = "/deneme";#}
+{##}
+{#            let labelInput = document.createElement("input");#}
+{#            labelInput.type = "hidden";#}
+{#            labelInput.name = "predictedLabel";#}
+{#            labelInput.value = bestLabel;#}
+{#            form.appendChild(labelInput);#}
+{##}
+{#            let confidenceInput = document.createElement("input");#}
+{#            confidenceInput.type = "hidden";#}
+{#            confidenceInput.name = "confidence";#}
+{#            confidenceInput.value = bestScore.toFixed(2);#}
+{#            form.appendChild(confidenceInput);#}
+{##}
+{#            document.body.appendChild(form);#}
+{#            form.submit();#}
+{#        }, 3000);#}
+{##}
+{#        }#}
+{#    </script>#}
+
+</body>
+</html>
