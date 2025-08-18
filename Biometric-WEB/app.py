@@ -18,11 +18,11 @@ scaler = load('models/modelsv3/scaler.pkl')
 anomaly_agent = load('anomaly_agent/anomaly_agent.pkl')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = (
-    'mssql+pyodbc://:@\\SQLEXPRESS/SecurityWall?driver=ODBC+Driver+17+for+SQL+Server'
+    ''
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_PERMANENT'] = False
-app.secret_key = 'your_secret_key'
+app.secret_key = ''
 
 db = SQLAlchemy(app)
 
